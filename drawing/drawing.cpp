@@ -1,147 +1,167 @@
 // drawing.cpp : Defines the entry point for the console application.
-//
 
 #include "stdafx.h"
 #include <iostream>
-#include <vector>
 #include <memory>
-#include <cstdio>
-#include <fstream>
-#include <cassert>
 #include <algorithm>
-
-
-
-
 
 class Figure
 {
 public:
-	Figure(int nrow = 30, int ncol = 40) : nrow_(nrow), ncol_(ncol)
+	Figure(const int nrow, const int ncol, const int color) : nrow_(nrow), ncol_(ncol), nelem_(ncol * nrow)
 	{
+		storage = new int[nelem_];
+		for (int ii=0; ii < nelem_; ++ii)
+		{
+			storage[ii] = color;
+		}
+	}
 
-
-		fig_.resize(nrow, std::vector<int>(ncol,0));
+	~Figure()
+	{
+		// delete the heap
+		delete storage;
 	}
 
 	void Print() const
 	{
-		for (auto vecRow : fig_)
-		{
-			for (auto elem : vecRow)
-			{				
-				std::cout << elem << ' ';
+		// reverse order to get a nicer representation
+		for (int jj = nrow_ - 1; jj >= 0; --jj)
+		{			
+			for (int ii = 0; ii<ncol_; ++ii)
+			{
+				// coordinate conversion
+				int zz;
+				XY2Z(ii, jj, zz);
+				// print the point
+				std::cout << storage[zz];
 			}
 			std::cout << std::endl;
 		}
+		std::cout << std::endl;
 	}
 
-	void CreateRect(int color, int x1, int y1, int x2, int y2)
+	void DrawPoint(const int xx, const int yy, const int color)
 	{
-		// checks
-		if (x1 < 0 || x1 > ncol_ || x2 < 0 || x2 > ncol_ || y1 < 0 || y1 > nrow_ || y2 < 0 || y2 > nrow_)
+		// coordinate conversion
+		int zz;
+		XY2Z(xx, yy, zz);
+		// check
+		if (zz<0 || zz>=nelem_)
 		{
-			std::cout << "points are out of reach. Nothing happens\n";
+			std::cout << "The point is out of the figure. Nothing happens.\n";
 			return;
 		}
+		// write the point
+		storage[zz] = color;
+	}
 
-		std::vector<int> XX = { x1, x2 };
-		std::vector<int> YY = { y1, y2 };
-		std::sort(XX.begin(), XX.end());
-		std::sort(YY.begin(), YY.end());
+	void DrawRectangle(int x1, int y1, int x2, int y2, const int color)
+	{
+		// sorting
+		SortAb(x2, x1);
+		SortAb(y2, y1);
 
+		// resizing if necessary
+		if (x1 < 0) { x1 = 0; }
+		if (y1 < 0) { y1 = 0; }
+		if (x2 >= ncol_) { x2 = ncol_-1; }
+		if (y2 >= nrow_) { y2 = nrow_-1; }
 
-		for (int jj = XX[0]; jj <= XX[1]; ++jj)
+		for (int ii = x1; ii <= x2; ++ii)
 		{
-			for (int ii = YY[0]; ii <= YY[1]; ++ii)
+			for (int jj = y1; jj <= y2; ++jj)
 			{
-				(fig_.at(ii)).at(jj) = color;
+				// coordinate conversion
+				int zz;
+				XY2Z(ii, jj, zz);
+				// write the point
+				storage[zz] = color;
 			}
 		}
 	}
 
-
-	void CreateLine(int color, int x1, int y1, int x2, int y2)
+	void DrawLine(int x1, int y1,int x2,int y2, const int color)
 	{
+		// resolve the point case
+		if (x1 == x2 && y1 == y2) { DrawPoint(x1, y1, color); return; }
+
 		// checks
-		if (x1 < 0 || x1 > ncol_ || x2 < 0 || x2 > ncol_ || y1 < 0 || y1 > nrow_ || y2 < 0 || y2 > nrow_)
-		{
-			std::cout << "points are out of reach. Nothing happens\n";
-			return;
-		}
+		int z1;
+		XY2Z(x1, y1, z1);		
+		if (z1 < 0 || z1 >= nelem_) { std::cout << "Point 1 is out of the figure. Nothing happens.\n"; return; }
+		int z2;
+		XY2Z(x2, y2, z2);
+		if (z2 < 0 || z2 >= nelem_) { std::cout << "Point 2 is out of the figure. Nothing happens.\n"; return; }
 
-		int distX = std::abs(x1 - x2);
-		int distY = std::abs(y1 - y2);
+		int deltaXabs = std::abs(x1 - x2);
+		int deltaYabs = std::abs(y1 - y2);
 
-		if (distX == 0 && distY == 0)
+		if (deltaXabs >= deltaYabs)
 		{
-			fig_.at(y1).at(x1) = color;
-		}
-		else if (distY > distX)
-		{
-			int incr = 1;
-			if (y2 < y1)
+			// sort points
+			SortAbCd(x2, x1, y2, y1);
+			const int deltaX = x2 - x1;
+			const int deltaY = y2 - y1;
+
+			for (int ii = x1; ii <= x2; ++ii)
 			{
-				incr = -1;
-			}
-
-
-			for (int jj = y1; jj != y2 + incr; jj += incr)
-			{
-				const int ii = X2Y(jj, y1, x1, y2, x2);
-				fig_.at(jj).at(ii) = color;
+				const int jj = FX2Y(x1, y1, deltaX, deltaY, ii);
+				// coordinate conversion
+				int zz;
+				XY2Z(ii, jj, zz);
+				// write the point
+				storage[zz] = color;
 			}
 		}
 		else
 		{
-			int incr = 1;
-			if (x2 < x1)
-			{
-				incr = -1;
-			}
+			// sort points
+			SortAbCd(y2, y1, x2, x1);
+			const int deltaX = x2 - x1;
+			const int deltaY = y2 - y1;
 
-			for (int ii = x1; ii != x2 + incr; ii += incr)
+			for (int jj = y1; jj <= y2; ++jj)
 			{
-				const int jj = X2Y(ii, x1, y1, x2, y2);
-				fig_.at(jj).at(ii) = color;
+				const int ii = FX2Y(y1, x1, deltaY, deltaX, jj);
+				// coordinate conversion
+				int zz;
+				XY2Z(ii, jj, zz);
+				// write the point
+				storage[zz] = color;
 			}
-
 		}
-
 	}
-
 
 private:
 
-	int X2Y(const int &xx, const int &x1, const int &y1, const int &x2, const int &y2) const
-	{
-		const double alpha = ((double) (y2 - y1)) / (x2 - x1);
-		const double q = y1 - x1 * alpha;
-		return std::round(alpha * xx + q);
-	}
+	inline void XY2Z(const int X, const int Y, int& Z) const { Z = ncol_ * Y + X; }
 
-	std::vector<std::vector<int> > fig_;
+	inline void Z2XY(const int Z, int& X, int& Y) const { X = Z % ncol_; Y = Z / ncol_; }
+
+	// sort a and b. At the end A is always >= b
+	inline void SortAb(int& A, int& b) { if (A < b) { int temp = A; A = b; b = temp; } }
+
+	// sort A, b, C, d based on A and b
+	inline void SortAbCd(int& A, int& b, int& C, int& d) { if (A < b) {int temp = A; A = b; b = temp; temp = C; C = d; d = temp; } }
+
+	// determine the jj index of a discrete line y = f(x). x1 < x2 is a requirement
+	inline int FX2Y(const int x1, const int y1, const int deltaX, const int deltaY, const int ii) { return (deltaY * (ii - x1 + (deltaX+1)/(deltaY+1) -1) + deltaX * y1) / deltaX; }
+
+	// --- variables --- //
+	int* storage;
 	const int nrow_;
 	const int ncol_;
+	const int nelem_;
 };
 
 int main()
 {
-	char conti = 'y';
+	auto figp = std::make_unique<Figure>(10, 10, 0);
 
-	auto figp = std::make_unique<Figure>(10, 10);
-	figp->CreateLine(1, 1, 1, 5,7);
-	figp->CreateRect(2, 7,1, 9, 3);
+	figp->DrawLine(9, 9, 0, 0, 1);
+	figp->Print();
 
-	while (conti == 'y')
-	{
-
-		figp->Print();
-
-		std::cout << "Do you want to continue? [y/anything else, please a char :P] ";
-		std::cin >> conti;
-	}
-    return 0;
+	std::cin.get();
+	return 0;
 }
-
-
