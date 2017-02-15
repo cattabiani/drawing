@@ -85,48 +85,83 @@ public:
 		if (x1 == x2 && y1 == y2) { DrawPoint(x1, y1, color); return; }
 
 		// checks
-		if (x1 < 0 || x1 >= ncol_ || y1 < 0 || y1 >= nrow_) { std::cout << "Point 1 is out of the figure. Nothing happens.\n"; return; }
-		int z1 = XY2Z(x1, y1);
-		
-		if (x2 < 0 || x2 >= ncol_ || y2 < 0 || y2 >= nrow_) { std::cout << "Point 2 is out of the figure. Nothing happens.\n"; return; }
-		int z2 = XY2Z(x2, y2);
-		
+		bool noClip = true;
+		if (x1 < 0 || x1 >= ncol_ || y1 < 0 || y1 >= nrow_ || x2 < 0 || x2 >= ncol_ || y2 < 0 || y2 >= nrow_) 
+		{ 
+			std::cout << "Point 1 and/or point 2 is/are out of the figure. Clipping happens.\n"; 
+			noClip = false;
+			return; 
+		}
 
 		int deltaXabs = std::abs(x1 - x2);
 		int deltaYabs = std::abs(y1 - y2);
 
-		if (deltaXabs >= deltaYabs)
+		if (noClip)
 		{
-			// sort points based on x1, x2
-			if (x1 > x2) { std::swap(x1, x2); std::swap(y1, y2); }
-
-			const int deltaX = x2 - x1;
-			const int deltaY = y2 - y1;
-
-			for (int ii = x1; ii <= x2; ++ii)
+			if (deltaXabs >= deltaYabs)
 			{
-				const int jj = FX2Y(x1, y1, deltaX, deltaY, ii);
-				// coordinate conversion
-				int zz = XY2Z(ii, jj);
-				// write the point
-				storage[zz] = color;
+				// sort points based on x1, x2
+				if (x1 > x2) { std::swap(x1, x2); std::swap(y1, y2); }
+
+				const int deltaX = x2 - x1;
+				const int deltaY = y2 - y1;
+
+				for (int ii = x1; ii <= x2; ++ii)
+				{
+					const int jj = FX2Y(x1, y1, deltaX, deltaY, ii);
+					// coordinate conversion
+					int zz = XY2Z(ii, jj);
+					// write the point
+					storage[zz] = color;
+				}
+			}
+			else
+			{
+				// sort points based on y1, y2
+				if (y1 > y2) { std::swap(x1, x2); std::swap(y1, y2); }
+
+				const int deltaX = x2 - x1;
+				const int deltaY = y2 - y1;
+
+				for (int jj = y1; jj <= y2; ++jj)
+				{
+					const int ii = FX2Y(y1, x1, deltaY, deltaX, jj);
+					// coordinate conversion
+					int zz = XY2Z(ii, jj);
+					// write the point
+					storage[zz] = color;
+				}
 			}
 		}
 		else
 		{
-			// sort points based on y1, y2
-			if (y1 > y2) { std::swap(x1, x2); std::swap(y1, y2); }
-
-			const int deltaX = x2 - x1;
-			const int deltaY = y2 - y1;
-
-			for (int jj = y1; jj <= y2; ++jj)
+			if (deltaXabs >= deltaYabs)
 			{
-				const int ii = FX2Y(y1, x1, deltaY, deltaX, jj);
-				// coordinate conversion
-				int zz = XY2Z(ii, jj);
-				// write the point
-				storage[zz] = color;
+				// sort points based on x1, x2
+				if (x1 > x2) { std::swap(x1, x2); std::swap(y1, y2); }
+
+				const int deltaX = x2 - x1;
+				const int deltaY = y2 - y1;
+
+				for (int ii = x1; ii <= x2; ++ii)
+				{
+					const int jj = FX2Y(x1, y1, deltaX, deltaY, ii);
+					DrawPointNoMessages(ii, jj, color);
+				}
+			}
+			else
+			{
+				// sort points based on y1, y2
+				if (y1 > y2) { std::swap(x1, x2); std::swap(y1, y2); }
+
+				const int deltaX = x2 - x1;
+				const int deltaY = y2 - y1;
+
+				for (int jj = y1; jj <= y2; ++jj)
+				{
+					const int ii = FX2Y(y1, x1, deltaY, deltaX, jj);
+					DrawPointNoMessages(ii, jj, color);
+				}
 			}
 		}
 	}
@@ -139,6 +174,18 @@ private:
 
 	// determine the jj index of a discrete line y = f(x). x1 < x2 is a requirement
 	inline int FX2Y(const int x1, const int y1, const int deltaX, const int deltaY, const int ii) { return (deltaY * (ii - x1 + (deltaX+1)/(deltaY+1) -1) + deltaX * y1) / deltaX; }
+
+	inline void DrawPointNoMessages(const int xx, const int yy, const int color)
+	{
+		// check
+		if (xx >= 0 && xx < ncol_ && yy >= 0 && yy < nrow_) 
+		{ 
+			// coordinate conversion
+			int zz = XY2Z(xx, yy); 
+			// write the point
+			storage[zz] = color;
+		}
+	}
 
 	// --- variables --- //
 	int* storage;
