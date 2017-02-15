@@ -8,8 +8,12 @@
 class Figure
 {
 public:
-	Figure(const int nrow, const int ncol, const int color) : nrow_(nrow), ncol_(ncol), nelem_(ncol * nrow)
+	Figure(const int nrow, const int ncol, const int color) : nrow_(std::abs(nrow)), ncol_(std::abs(ncol)), nelem_(ncol * nrow)
 	{
+		// checks
+		if (nrow_ > 46340) { std::cout << "Too many rows!"; return; }
+		if (ncol_ > 46340) { std::cout << "Too many columns!"; return; }
+
 		storage = new int[nelem_];
 		for (int ii=0; ii < nelem_; ++ii)
 		{
@@ -31,8 +35,7 @@ public:
 			for (int ii = 0; ii<ncol_; ++ii)
 			{
 				// coordinate conversion
-				int zz;
-				XY2Z(ii, jj, zz);
+				int zz = XY2Z(ii, jj);
 				// print the point
 				std::cout << storage[zz];
 			}
@@ -43,15 +46,11 @@ public:
 
 	void DrawPoint(const int xx, const int yy, const int color)
 	{
-		// coordinate conversion
-		int zz;
-		XY2Z(xx, yy, zz);
 		// check
-		if (zz<0 || zz>=nelem_)
-		{
-			std::cout << "The point is out of the figure. Nothing happens.\n";
-			return;
-		}
+		if (xx < 0 || xx >= ncol_ || yy < 0 || yy >= nrow_) { std::cout << "The point is out of the figure. Nothing happens.\n"; return; }
+		// coordinate conversion
+		int zz = XY2Z(xx, yy);
+
 		// write the point
 		storage[zz] = color;
 	}
@@ -59,8 +58,8 @@ public:
 	void DrawRectangle(int x1, int y1, int x2, int y2, const int color)
 	{
 		// sorting
-		SortAb(x2, x1);
-		SortAb(y2, y1);
+		if (x1 > x2) { std::swap(x1, x2); }
+		if (y1 > y2) { std::swap(y1, y2); }
 
 		// resizing if necessary
 		if (x1 < 0) { x1 = 0; }
@@ -73,8 +72,7 @@ public:
 			for (int jj = y1; jj <= y2; ++jj)
 			{
 				// coordinate conversion
-				int zz;
-				XY2Z(ii, jj, zz);
+				int zz = XY2Z(ii, jj);
 				// write the point
 				storage[zz] = color;
 			}
@@ -87,20 +85,21 @@ public:
 		if (x1 == x2 && y1 == y2) { DrawPoint(x1, y1, color); return; }
 
 		// checks
-		int z1;
-		XY2Z(x1, y1, z1);		
-		if (z1 < 0 || z1 >= nelem_) { std::cout << "Point 1 is out of the figure. Nothing happens.\n"; return; }
-		int z2;
-		XY2Z(x2, y2, z2);
-		if (z2 < 0 || z2 >= nelem_) { std::cout << "Point 2 is out of the figure. Nothing happens.\n"; return; }
+		if (x1 < 0 || x1 >= ncol_ || y1 < 0 || y1 >= nrow_) { std::cout << "Point 1 is out of the figure. Nothing happens.\n"; return; }
+		int z1 = XY2Z(x1, y1);
+		
+		if (x2 < 0 || x2 >= ncol_ || y2 < 0 || y2 >= nrow_) { std::cout << "Point 2 is out of the figure. Nothing happens.\n"; return; }
+		int z2 = XY2Z(x2, y2);
+		
 
 		int deltaXabs = std::abs(x1 - x2);
 		int deltaYabs = std::abs(y1 - y2);
 
 		if (deltaXabs >= deltaYabs)
 		{
-			// sort points
-			SortAbCd(x2, x1, y2, y1);
+			// sort points based on x1, x2
+			if (x1 > x2) { std::swap(x1, x2); std::swap(y1, y2); }
+
 			const int deltaX = x2 - x1;
 			const int deltaY = y2 - y1;
 
@@ -108,16 +107,16 @@ public:
 			{
 				const int jj = FX2Y(x1, y1, deltaX, deltaY, ii);
 				// coordinate conversion
-				int zz;
-				XY2Z(ii, jj, zz);
+				int zz = XY2Z(ii, jj);
 				// write the point
 				storage[zz] = color;
 			}
 		}
 		else
 		{
-			// sort points
-			SortAbCd(y2, y1, x2, x1);
+			// sort points based on y1, y2
+			if (y1 > y2) { std::swap(x1, x2); std::swap(y1, y2); }
+
 			const int deltaX = x2 - x1;
 			const int deltaY = y2 - y1;
 
@@ -125,8 +124,7 @@ public:
 			{
 				const int ii = FX2Y(y1, x1, deltaY, deltaX, jj);
 				// coordinate conversion
-				int zz;
-				XY2Z(ii, jj, zz);
+				int zz = XY2Z(ii, jj);
 				// write the point
 				storage[zz] = color;
 			}
@@ -135,15 +133,9 @@ public:
 
 private:
 
-	inline void XY2Z(const int X, const int Y, int& Z) const { Z = ncol_ * Y + X; }
+	inline int XY2Z(const int X, const int Y) const { return ncol_ * Y + X; }
 
 	inline void Z2XY(const int Z, int& X, int& Y) const { X = Z % ncol_; Y = Z / ncol_; }
-
-	// sort a and b. At the end A is always >= b
-	inline void SortAb(int& A, int& b) { if (A < b) { int temp = A; A = b; b = temp; } }
-
-	// sort A, b, C, d based on A and b
-	inline void SortAbCd(int& A, int& b, int& C, int& d) { if (A < b) {int temp = A; A = b; b = temp; temp = C; C = d; d = temp; } }
 
 	// determine the jj index of a discrete line y = f(x). x1 < x2 is a requirement
 	inline int FX2Y(const int x1, const int y1, const int deltaX, const int deltaY, const int ii) { return (deltaY * (ii - x1 + (deltaX+1)/(deltaY+1) -1) + deltaX * y1) / deltaX; }
